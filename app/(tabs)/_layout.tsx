@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Platform } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -30,6 +31,22 @@ export default function TabLayout() {
           shadowOpacity: 0.3,
           shadowRadius: 12,
           elevation: 8,
+          ...Platform.select({
+            ios: {
+              shadowColor: Colors.accent,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 12,
+            },
+            android: {
+              elevation: 4, // Simplified elevation for Android
+              height: 60,   // Slightly shorter for Android
+              paddingBottom: 4, // Adjust padding
+              marginBottom: 10, // Adjust margin
+              backgroundColor: '#18181B', // Using specific dark color for better contrast
+              borderTopWidth: 0,
+            }
+          }),
         },
       }}>
       <Tabs.Screen

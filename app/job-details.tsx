@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar } from 'react-native';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { mockJobs } from '@/data/mockData';
@@ -12,17 +13,52 @@ export default function JobDetailsScreen() {
     // Find job from mock data
     const job = mockJobs.find(j => j.id === jobId) || mockJobs[0];
 
+    // Mock coordinates for demo (San Francisco area)
+    const driverLocation = { latitude: 37.7749, longitude: -122.4194 };
+    const pickupLocation = { latitude: 37.7858, longitude: -122.4065 }; // ~Market St
+    const dropoffLocation = { latitude: 37.7648, longitude: -122.4630 }; // ~Sunset
+
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
+            <Stack.Screen options={{ headerShown: false }} />
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Map Container with Overlays */}
                 <View style={styles.mapContainer}>
-                    {/* Map Placeholder */}
-                    <View style={styles.mapPlaceholder}>
-                        <IconSymbol name="map.fill" size={60} color={Colors.textMuted} />
-                        <Text style={styles.mapPlaceholderText}>Map View</Text>
-                        <Text style={styles.mapPlaceholderSubtext}>Route visualization coming soon</Text>
-                    </View>
+                    <MapView
+                        style={styles.map}
+                        initialRegion={{
+                            latitude: 37.7750,
+                            longitude: -122.4400,
+                            latitudeDelta: 0.0922,
+                            longitudeDelta: 0.0421,
+                        }}
+                        provider={undefined} // Uses Apple Maps on iOS, Google Maps on Android
+                    >
+                        <Polyline
+                            coordinates={[driverLocation, pickupLocation, dropoffLocation]}
+                            strokeColor={Colors.accent}
+                            strokeWidth={4}
+                        />
+
+                        <Marker coordinate={driverLocation} title="You">
+                            <View style={styles.markerDriver}>
+                                <IconSymbol name="car.fill" size={16} color={Colors.secondary} />
+                            </View>
+                        </Marker>
+
+                        <Marker coordinate={pickupLocation} title="Pickup">
+                            <View style={styles.markerPickup}>
+                                <IconSymbol name="shippingbox.fill" size={16} color={Colors.secondary} />
+                            </View>
+                        </Marker>
+
+                        <Marker coordinate={dropoffLocation} title="Drop-off">
+                            <View style={styles.markerDropoff}>
+                                <IconSymbol name="mappin.circle.fill" size={16} color={Colors.white} />
+                            </View>
+                        </Marker>
+                    </MapView>
 
                     {/* Overlay Header - Back, Title, Share */}
                     <View style={styles.overlayHeader}>
@@ -156,7 +192,7 @@ export default function JobDetailsScreen() {
                     <IconSymbol name="arrow.right" size={24} color={Colors.secondary} />
                 </TouchableOpacity>
             </View>
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -172,22 +208,41 @@ const styles = StyleSheet.create({
         position: 'relative',
         height: 350,
     },
-    mapPlaceholder: {
-        height: 350,
-        backgroundColor: Colors.secondary,
+    map: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    markerDriver: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: Colors.accent,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
     },
-    mapPlaceholderText: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: Colors.textSecondary,
-        marginTop: 12,
+    markerPickup: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: Colors.accent,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: Colors.secondary,
     },
-    mapPlaceholderSubtext: {
-        fontSize: 14,
-        color: Colors.textMuted,
-        marginTop: 4,
+    markerDropoff: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#EF4444',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: Colors.white,
     },
     overlayHeader: {
         position: 'absolute',
@@ -197,21 +252,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 16,
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 40, // Absolute minimum
+        paddingBottom: 8,
         zIndex: 10,
+        backgroundColor: 'rgba(24, 24, 27, 0.85)',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(10px)',
     },
     overlayButton: {
-        width: 40,
-        height: 40,
+        width: 36, // Smaller buttons
+        height: 36,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        borderRadius: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        borderRadius: 18,
     },
     overlayTitle: {
-        fontSize: 20,
+        fontSize: 18, // Slightly smaller text
         fontWeight: '600',
         color: Colors.white,
     },
@@ -222,7 +281,7 @@ const styles = StyleSheet.create({
         right: 16,
         flexDirection: 'row',
         gap: 12,
-        zIndex: 10,
+        zIndex: 100,
     },
     statCard: {
         flex: 1,
