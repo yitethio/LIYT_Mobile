@@ -28,6 +28,26 @@ export interface Transaction {
     status: 'completed' | 'pending';
 }
 
+export interface User {
+    id: string;
+    full_name: string;
+    email: string;
+    phone: string;
+    vehicle_type?: string;
+    license_number?: string;
+    status?: string;
+    avatar?: string;
+    name?: string; // Compatibility field
+}
+
+export interface AuthState {
+    user: User | null;
+    token: string | null;
+    isAuthenticated: boolean;
+    loading: boolean;
+    error: string | null;
+}
+
 export interface DriverProfile {
     id: string;
     name: string;
