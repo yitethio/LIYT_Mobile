@@ -1,21 +1,39 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, RefreshControl } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { Colors } from '@/constants/theme';
 import { mockDriverProfile, mockTransactions } from '@/data/mockData';
 
 export default function MyJobsScreen() {
     const completedJobs = mockTransactions.filter(t => t.type === 'earning');
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        // Simulate refresh - replace with actual API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setRefreshing(false);
+    }, []);
 
     return (
         <SafeAreaView style={styles.container}>
             <AppHeader
-                userName={mockDriverProfile.name}
                 onNotificationPress={() => console.log('Notifications')}
                 onMenuPress={() => console.log('Menu')}
             />
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                style={styles.content} 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={Colors.accent}
+                        colors={[Colors.accent]}
+                    />
+                }
+            >
                 <Text style={styles.title}>My Jobs</Text>
                 <Text style={styles.subtitle}>
                     {completedJobs.length} completed deliveries
@@ -41,7 +59,7 @@ export default function MyJobsScreen() {
                                     </View>
                                     <View style={styles.earningsContainer}>
                                         <Text style={styles.earningsAmount}>
-                                            +${job.amount.toFixed(2)}
+                                            +ETB {job.amount.toFixed(2)}
                                         </Text>
                                         <View style={styles.statusBadge}>
                                             <Text style={styles.statusText}>{job.status}</Text>

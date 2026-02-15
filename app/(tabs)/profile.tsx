@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { RootState, AppDispatch } from '@/store/store';
@@ -11,9 +11,18 @@ export default function ProfileScreen() {
     const dispatch = useDispatch<AppDispatch>();
     const router = useRouter();
     const { user, loading } = useSelector((state: RootState) => state.auth);
+    const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
-        dispatch(fetchProfile());
+    useFocusEffect(
+        useCallback(() => {
+            dispatch(fetchProfile());
+        }, [dispatch])
+    );
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await dispatch(fetchProfile());
+        setRefreshing(false);
     }, [dispatch]);
 
     const handleLogout = () => {
@@ -44,7 +53,18 @@ export default function ProfileScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                style={styles.content} 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={Colors.accent}
+                        colors={[Colors.accent]}
+                    />
+                }
+            >
                 {/* Profile Header */}
                 <View style={styles.header}>
                     <View style={styles.avatarLarge}>
@@ -135,6 +155,7 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
+        paddingBottom: 100,
     },
     header: {
         alignItems: 'center',

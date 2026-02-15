@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { AppHeader } from '@/components/AppHeader';
 import { StatsCard } from '@/components/StatsCard';
 import { JobCard } from '@/components/JobCard';
@@ -13,10 +13,19 @@ export default function HomeScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'available' | 'current'>('available');
+  const [refreshing, setRefreshing] = useState(false);
   const { deliveries, loading } = useSelector((state: RootState) => state.deliveries);
 
-  useEffect(() => {
-    dispatch(fetchDeliveries());
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(fetchDeliveries());
+    }, [dispatch])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await dispatch(fetchDeliveries());
+    setRefreshing(false);
   }, [dispatch]);
 
   const availableJobs = deliveries.filter(job => job.status === 'pending');
@@ -33,7 +42,18 @@ export default function HomeScreen() {
         onMenuPress={() => console.log('Menu')}
       />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.accent}
+            colors={[Colors.accent]}
+          />
+        }
+      >
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
           <StatsCard

@@ -33,7 +33,8 @@ export function JobCard({
         if (onPress) {
             onPress();
         }
-        router.push(`/job-details?id=${jobId}`);
+        // Use replace to avoid duplicate entries in navigation stack
+        router.push(`/job-details?id=${jobId}` as any);
     };
     return (
         <TouchableOpacity
@@ -84,7 +85,7 @@ export function JobCard({
                     ))}
                 </View>
                 <View style={styles.priceContainer}>
-                    <Text style={styles.priceText}>${Number(price).toFixed(2)}</Text>
+                    <Text style={styles.priceText}>ETB {Number(price).toFixed(2)}</Text>
                 </View>
             </View>
         </TouchableOpacity>
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     priceText: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '700',
         color: Colors.secondary,
     },
