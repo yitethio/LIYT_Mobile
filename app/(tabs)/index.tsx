@@ -1,21 +1,34 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { useRouter } from 'expo-router';
 import { AppHeader } from '@/components/AppHeader';
 import { StatsCard } from '@/components/StatsCard';
 import { JobCard } from '@/components/JobCard';
 import { Colors } from '@/constants/theme';
-import { mockJobs, mockDriverStats, mockDriverProfile } from '@/data/mockData';
+import { RootState, AppDispatch } from '@/store/store';
+import { fetchDeliveries } from '@/store/slices/deliveriesSlice';
 
 export default function HomeScreen() {
+  const dispatch = useDispatch<AppDispatch>();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'available' | 'current'>('available');
+  const { deliveries, loading } = useSelector((state: RootState) => state.deliveries);
 
-  const availableJobs = mockJobs.filter(job => job.status === 'available');
-  const currentJobs = mockJobs.filter(job => job.status === 'current');
+  useEffect(() => {
+    dispatch(fetchDeliveries());
+  }, [dispatch]);
+
+  const availableJobs = deliveries.filter(job => job.status === 'pending');
+  const currentJobs = deliveries.filter(job => ['accepted', 'picked_up', 'in_transit'].includes(job.status));
+
+  const handleJobPress = (jobId: number) => {
+    router.push({ pathname: '/job-details', params: { id: jobId.toString() } });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader
-        userName={mockDriverProfile.name}
         onNotificationPress={() => console.log('Notifications')}
         onMenuPress={() => console.log('Menu')}
       />
@@ -25,12 +38,12 @@ export default function HomeScreen() {
         <View style={styles.statsContainer}>
           <StatsCard
             title="Today's Earnings"
-            value={`$${mockDriverStats.todayEarnings.toFixed(2)}`}
+            value="$0.00"
           />
           <View style={styles.statsGap} />
           <StatsCard
             title="Online Time"
-            value={mockDriverStats.onlineTime}
+            value="0h 0m"
           />
         </View>
 
@@ -57,26 +70,57 @@ export default function HomeScreen() {
         {/* Jobs List */}
         <View style={styles.jobsSection}>
           <Text style={styles.sectionTitle}>
-            Nearby Offers ({activeTab === 'available' ? availableJobs.length : currentJobs.length})
+            {activeTab === 'available' ? 'Available Jobs' : 'Current Jobs'} ({activeTab === 'available' ? availableJobs.length : currentJobs.length})
           </Text>
 
-          {activeTab === 'available' && availableJobs.map((job) => (
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.accent} />
+            </View>
+          )}
+
+          {!loading && activeTab === 'available' && availableJobs.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No available jobs</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Check back later for new delivery requests
+              </Text>
+            </View>
+          )}
+
+          {!loading && activeTab === 'available' && availableJobs.map((job) => (
             <JobCard
               key={job.id}
-              jobId={job.id}
-              pickupLocation={job.pickupLocation}
-              pickupAddress={job.pickupAddress}
-              dropoffLocation={job.dropoffLocation}
-              dropoffAddress={job.dropoffAddress}
-              distance={job.distance}
-              estimatedTime={job.estimatedTime}
-              price={job.price}
-              tags={job.tags}
-              onPress={() => console.log('Job pressed:', job.id)}
+              jobId={job.id.toString()}
+              pickupLocation={job.pickup?.city || job.pickup_address?.city || 'Pickup'}
+              pickupAddress={job.pickup?.address1 || job.pickup_address?.address1 || job.pickup?.region || 'Pickup Location'}
+              dropoffLocation={job.dropoff?.city || job.dropoff_address?.city || 'Drop-off'}
+              dropoffAddress={job.dropoff?.address1 || job.dropoff_address?.address1 || job.dropoff?.region || 'Drop-off Location'}
+              distance="0"
+              estimatedTime="0 min"
+              price={Number(job.price)}
+              tags={[]}
+              onPress={() => handleJobPress(job.id)}
             />
           ))}
 
-          {activeTab === 'current' && currentJobs.length === 0 && (
+          {!loading && activeTab === 'current' && currentJobs.map((job) => (
+            <JobCard
+              key={job.id}
+              jobId={job.id.toString()}
+              pickupLocation={job.pickup?.city || job.pickup_address?.city || 'Pickup'}
+              pickupAddress={job.pickup?.address1 || job.pickup_address?.address1 || job.pickup?.region || 'Pickup Location'}
+              dropoffLocation={job.dropoff?.city || job.dropoff_address?.city || 'Drop-off'}
+              dropoffAddress={job.dropoff?.address1 || job.dropoff_address?.address1 || job.dropoff?.region || 'Drop-off Location'}
+              distance="0"
+              estimatedTime="0 min"
+              price={Number(job.price)}
+              tags={[job.status.replace('_', ' ')]}
+              onPress={() => handleJobPress(job.id)}
+            />
+          ))}
+
+          {!loading && activeTab === 'current' && currentJobs.length === 0 && (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>No current jobs</Text>
               <Text style={styles.emptyStateSubtext}>
@@ -155,6 +199,10 @@ const styles = StyleSheet.create({
   emptyStateSubtext: {
     fontSize: 14,
     color: Colors.textSecondary,
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
   },
 });
 

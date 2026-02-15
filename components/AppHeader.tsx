@@ -1,15 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSelector } from 'react-redux';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { RootState } from '@/store/store';
 
 interface AppHeaderProps {
-    userName: string;
     onNotificationPress?: () => void;
     onMenuPress?: () => void;
 }
 
-export function AppHeader({ userName, onNotificationPress, onMenuPress }: AppHeaderProps) {
+export function AppHeader({ onNotificationPress, onMenuPress }: AppHeaderProps) {
+    const { user } = useSelector((state: RootState) => state.auth);
+    const userName = user?.full_name || user?.name || 'Driver';
+
     return (
         <View style={styles.header}>
             <View style={styles.leftSection}>

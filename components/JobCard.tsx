@@ -84,7 +84,7 @@ export function JobCard({
                     ))}
                 </View>
                 <View style={styles.priceContainer}>
-                    <Text style={styles.priceText}>${price.toFixed(2)}</Text>
+                    <Text style={styles.priceText}>${Number(price).toFixed(2)}</Text>
                 </View>
             </View>
         </TouchableOpacity>

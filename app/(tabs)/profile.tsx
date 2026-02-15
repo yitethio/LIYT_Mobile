@@ -1,11 +1,46 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import { mockDriverProfile } from '@/data/mockData';
+import { RootState, AppDispatch } from '@/store/store';
+import { fetchProfile, logout } from '@/store/slices/authSlice';
 
 export default function ProfileScreen() {
-    const { name, email, phone, rating, totalTrips, vehicleInfo } = mockDriverProfile;
+    const dispatch = useDispatch<AppDispatch>();
+    const router = useRouter();
+    const { user, loading } = useSelector((state: RootState) => state.auth);
+
+    useEffect(() => {
+        dispatch(fetchProfile());
+    }, [dispatch]);
+
+    const handleLogout = () => {
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await dispatch(logout());
+                        router.replace('/auth/login');
+                    },
+                },
+            ]
+        );
+    };
+
+    const name = user?.full_name || user?.name || 'Driver';
+    const email = user?.email || 'No email';
+    const phone = user?.phone || 'No phone';
+    const rating = user?.rating?.toFixed(1) || 'N/A';
+    const vehicleType = user?.vehicle_type || 'Not set';
+    const licenseNumber = user?.license_number || 'Not set';
+    const status = user?.status || 'active';
 
     return (
         <SafeAreaView style={styles.container}>
@@ -19,7 +54,7 @@ export default function ProfileScreen() {
                     <View style={styles.ratingContainer}>
                         <IconSymbol name="star.fill" size={20} color={Colors.accent} />
                         <Text style={styles.rating}>{rating}</Text>
-                        <Text style={styles.tripsText}>• {totalTrips} trips</Text>
+                        <Text style={styles.tripsText}>• {status}</Text>
                     </View>
                 </View>
 
@@ -46,13 +81,13 @@ export default function ProfileScreen() {
                         <View style={styles.infoRow}>
                             <IconSymbol name="car.fill" size={20} color={Colors.textSecondary} />
                             <Text style={styles.infoText}>
-                                {vehicleInfo.year} {vehicleInfo.make} {vehicleInfo.model}
+                                {vehicleType}
                             </Text>
                         </View>
                         <View style={styles.divider} />
                         <View style={styles.infoRow}>
                             <IconSymbol name="number" size={20} color={Colors.textSecondary} />
-                            <Text style={styles.infoText}>{vehicleInfo.licensePlate}</Text>
+                            <Text style={styles.infoText}>{licenseNumber}</Text>
                         </View>
                     </View>
                 </View>
@@ -60,7 +95,7 @@ export default function ProfileScreen() {
                 {/* Settings Options */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Settings</Text>
-                    <TouchableOpacity style={styles.menuItem}>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
                         <View style={styles.menuItemLeft}>
                             <IconSymbol name="person.fill" size={20} color={Colors.white} />
                             <Text style={styles.menuItemText}>Account Settings</Text>
@@ -81,7 +116,7 @@ export default function ProfileScreen() {
                         </View>
                         <IconSymbol name="chevron.right" size={20} color={Colors.textSecondary} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.menuItem, styles.logoutItem]}>
+                    <TouchableOpacity style={[styles.menuItem, styles.logoutItem]} onPress={handleLogout}>
                         <View style={styles.menuItemLeft}>
                             <IconSymbol name="arrow.right.square.fill" size={20} color={Colors.urgent} />
                             <Text style={[styles.menuItemText, styles.logoutText]}>Logout</Text>

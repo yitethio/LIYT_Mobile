@@ -35,13 +35,19 @@ export const fetchProfile = createAsyncThunk(
     'auth/fetchProfile',
     async (_, { rejectWithValue }) => {
         try {
-            // Try common endpoint for profile
             const response = await api.get('/drivers/me');
             const data = response.data;
-            // Map keys if needed (response is { id, email, full_name, ... })
             return {
-                ...data,
-                name: data.full_name || data.name || data.email?.split('@')[0] || 'Driver',
+                id: data.id,
+                email: data.email,
+                full_name: data.full_name,
+                phone: data.phone,
+                name: data.full_name || data.email?.split('@')[0] || 'Driver',
+                status: data.status,
+                vehicle_type: data.vehicle_type,
+                license_number: data.license_number,
+                rating: data.rating,
+                verified_at: data.verified_at,
             };
         } catch (error: any) {
             return rejectWithValue(error.response?.data?.message || 'Failed to fetch profile');

@@ -1,22 +1,108 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
+import { useDispatch, useSelector } from 'react-redux';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import { mockJobs } from '@/data/mockData';
+import { RootState, AppDispatch } from '@/store/store';
+import { fetchDeliveryById, acceptDelivery, clearCurrentDelivery } from '@/store/slices/deliveriesSlice';
 
 export default function JobDetailsScreen() {
     const params = useLocalSearchParams();
     const jobId = params.id as string;
+    const dispatch = useDispatch<AppDispatch>();
+    const { currentDelivery, loading } = useSelector((state: RootState) => state.deliveries);
+    const [isAccepting, setIsAccepting] = useState(false);
 
-    // Find job from mock data
-    const job = mockJobs.find(j => j.id === jobId) || mockJobs[0];
+    useEffect(() => {
+        if (jobId) {
+            dispatch(fetchDeliveryById(jobId));
+        }
+        return () => {
+            dispatch(clearCurrentDelivery());
+        };
+    }, [dispatch, jobId]);
 
-    // Mock coordinates for demo (San Francisco area)
-    const driverLocation = { latitude: 37.7749, longitude: -122.4194 };
-    const pickupLocation = { latitude: 37.7858, longitude: -122.4065 }; // ~Market St
-    const dropoffLocation = { latitude: 37.7648, longitude: -122.4630 }; // ~Sunset
+    const handleAccept = async () => {
+        Alert.alert(
+            'Accept Job',
+            'Are you sure you want to accept this delivery?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Accept',
+                    onPress: async () => {
+                        setIsAccepting(true);
+                        try {
+                            await dispatch(acceptDelivery(jobId)).unwrap();
+                            Alert.alert('Success', 'Job accepted successfully!', [
+                                { text: 'OK', onPress: () => router.back() }
+                            ]);
+                        } catch (error: any) {
+                            Alert.alert('Error', error || 'Failed to accept job');
+                        } finally {
+                            setIsAccepting(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const job = currentDelivery;
+
+    if (!job) {
+        return (
+            <View style={styles.container}>
+                <Stack.Screen options={{ headerShown: false }} />
+                <View style={styles.loadingContainer}>
+                    {loading ? (
+                        <ActivityIndicator size="large" color={Colors.accent} />
+                    ) : (
+                        <Text style={styles.errorText}>Job not found</Text>
+                    )}
+                </View>
+            </View>
+        );
+    }
+
+    const pickupLocation = job.pickup?.latitude && job.pickup?.longitude ?
+        { latitude: parseFloat(String(job.pickup.latitude)), longitude: parseFloat(String(job.pickup.longitude)) } :
+        job.pickup_address?.latitude && job.pickup_address?.longitude ?
+            { latitude: parseFloat(String(job.pickup_address.latitude)), longitude: parseFloat(String(job.pickup_address.longitude)) } :
+            { latitude: 37.7858, longitude: -122.4065 };
+    
+    const dropoffLocation = job.dropoff?.latitude && job.dropoff?.longitude ?
+        { latitude: parseFloat(String(job.dropoff.latitude)), longitude: parseFloat(String(job.dropoff.longitude)) } :
+        job.dropoff_address?.latitude && job.dropoff_address?.longitude ?
+            { latitude: parseFloat(String(job.dropoff_address.latitude)), longitude: parseFloat(String(job.dropoff_address.longitude)) } :
+            { latitude: 37.7648, longitude: -122.4630 };
+
+    const mapRegion = {
+        latitude: (pickupLocation.latitude + dropoffLocation.latitude) / 2,
+        longitude: (pickupLocation.longitude + dropoffLocation.longitude) / 2,
+        latitudeDelta: Math.abs(pickupLocation.latitude - dropoffLocation.latitude) * 2 || 0.05,
+        longitudeDelta: Math.abs(pickupLocation.longitude - dropoffLocation.longitude) * 2 || 0.05,
+    };
+
+    const getButtonText = () => {
+        switch (job.status) {
+            case 'pending':
+                return 'Accept Job';
+            case 'accepted':
+                return 'Mark Picked Up';
+            case 'picked_up':
+            case 'in_transit':
+                return 'Complete Delivery';
+            case 'delivered':
+                return 'Delivered';
+            default:
+                return 'Accept Job';
+        }
+    };
+
+    const isButtonDisabled = job.status === 'delivered' || job.status === 'cancelled';
 
     return (
         <View style={styles.container}>
@@ -27,25 +113,14 @@ export default function JobDetailsScreen() {
                 <View style={styles.mapContainer}>
                     <MapView
                         style={styles.map}
-                        initialRegion={{
-                            latitude: 37.7750,
-                            longitude: -122.4400,
-                            latitudeDelta: 0.0922,
-                            longitudeDelta: 0.0421,
-                        }}
-                        provider={undefined} // Uses Apple Maps on iOS, Google Maps on Android
+                        initialRegion={mapRegion}
+                        provider={undefined}
                     >
                         <Polyline
-                            coordinates={[driverLocation, pickupLocation, dropoffLocation]}
+                            coordinates={[pickupLocation, dropoffLocation]}
                             strokeColor={Colors.accent}
                             strokeWidth={4}
                         />
-
-                        <Marker coordinate={driverLocation} title="You">
-                            <View style={styles.markerDriver}>
-                                <IconSymbol name="car.fill" size={16} color={Colors.secondary} />
-                            </View>
-                        </Marker>
 
                         <Marker coordinate={pickupLocation} title="Pickup">
                             <View style={styles.markerPickup}>
@@ -78,16 +153,16 @@ export default function JobDetailsScreen() {
                     <View style={styles.floatingStatsContainer}>
                         <View style={styles.statCard}>
                             <Text style={styles.statLabel}>Payout</Text>
-                            <Text style={styles.statValue}>${job.price.toFixed(2)}</Text>
+                            <Text style={styles.statValue}>${Number(job.price).toFixed(2)}</Text>
                         </View>
                         <View style={styles.statCard}>
                             <Text style={styles.statLabel}>Distance</Text>
-                            <Text style={styles.statValue}>{job.distance.split(' ')[0]}</Text>
+                            <Text style={styles.statValue}>0</Text>
                             <Text style={styles.statUnit}>mi</Text>
                         </View>
                         <View style={styles.statCard}>
                             <Text style={styles.statLabel}>Est. Time</Text>
-                            <Text style={styles.statValue}>{job.estimatedTime.replace('~', '').replace(' min', '')}</Text>
+                            <Text style={styles.statValue}>0</Text>
                             <Text style={styles.statUnit}>min</Text>
                         </View>
                     </View>
@@ -107,14 +182,20 @@ export default function JobDetailsScreen() {
                         <View style={styles.timelineContent}>
                             <View style={styles.timelineHeader}>
                                 <Text style={styles.timelineTitle}>
-                                    Pickup: {job.pickupAddress}
+                                    Pickup
                                 </Text>
                                 <View style={styles.readyBadge}>
                                     <Text style={styles.readyText}>Ready</Text>
                                 </View>
                             </View>
                             <Text style={styles.timelineAddress}>
-                                742 Market Street, San Francisco, CA
+                                {job.pickup?.address1 || 'Pickup Location'}
+                            </Text>
+                            <Text style={styles.timelineAddress}>
+                                {job.pickup?.city}, {job.pickup?.region}
+                            </Text>
+                            <Text style={styles.timelineContact}>
+                                {job.pickup?.contact_name} • {job.pickup?.contact_phone}
                             </Text>
                         </View>
                     </View>
@@ -132,44 +213,90 @@ export default function JobDetailsScreen() {
                         <View style={styles.timelineContent}>
                             <View style={styles.timelineHeader}>
                                 <Text style={styles.timelineTitle}>
-                                    Drop-off: {job.dropoffAddress}
+                                    Drop-off
                                 </Text>
                                 <View style={styles.timeBadge}>
-                                    <Text style={styles.timeText}>By 4:30 PM</Text>
+                                    <Text style={styles.timeText}>Pending</Text>
                                 </View>
                             </View>
                             <Text style={styles.timelineAddress}>
-                                1240 12th Avenue, San Francisco, CA
+                                {job.dropoff?.address1 || 'Drop-off Location'}
                             </Text>
+                            <Text style={styles.timelineAddress}>
+                                {job.dropoff?.city}, {job.dropoff?.region}
+                            </Text>
+                            {job.customer && (
+                                <Text style={styles.timelineContact}>
+                                    {job.customer.full_name} • {job.customer.phone}
+                                </Text>
+                            )}
                         </View>
                     </View>
                 </View>
 
-                {/* Package Information */}
-                <View style={styles.section}>
-                    <View style={styles.packageHeader}>
-                        <IconSymbol name="info.circle.fill" size={20} color={Colors.accent} />
-                        <Text style={styles.sectionTitle}>Package Information</Text>
+                {/* Business Info */}
+                {job.business && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Business</Text>
+                        <View style={styles.infoCard}>
+                            <View style={styles.infoRow}>
+                                <IconSymbol name="building.2.fill" size={20} color={Colors.textSecondary} />
+                                <Text style={styles.infoText}>{job.business.name}</Text>
+                            </View>
+                            {job.description && (
+                                <>
+                                    <View style={styles.divider} />
+                                    <View style={styles.infoRow}>
+                                        <IconSymbol name="doc.text.fill" size={20} color={Colors.textSecondary} />
+                                        <Text style={styles.infoText}>{job.description}</Text>
+                                    </View>
+                                </>
+                            )}
+                        </View>
                     </View>
+                )}
 
-                    <View style={styles.packageCard}>
-                        <View style={styles.packageRow}>
-                            <View style={styles.packageInfo}>
-                                <Text style={styles.packageLabel}>Type</Text>
-                                <Text style={styles.packageValue}>Electronics (Fragile)</Text>
-                            </View>
-                            <View style={styles.packageInfo}>
-                                <Text style={styles.packageLabel}>Weight</Text>
-                                <Text style={styles.packageValue}>4.5 lbs</Text>
-                            </View>
+                {/* Package Information */}
+                {job.items && job.items.length > 0 && (
+                    <View style={styles.section}>
+                        <View style={styles.packageHeader}>
+                            <IconSymbol name="info.circle.fill" size={20} color={Colors.accent} />
+                            <Text style={styles.sectionTitle}>Package Information</Text>
                         </View>
 
-                        <View style={styles.divider} />
+                        <View style={styles.packageCard}>
+                            {job.items?.map((item, index) => (
+                                <View key={item.id || index}>
+                                    <View style={styles.packageRow}>
+                                        <View style={styles.packageInfo}>
+                                            <Text style={styles.packageLabel}>Item</Text>
+                                            <Text style={styles.packageValue}>{item.name}</Text>
+                                        </View>
+                                        <View style={styles.packageInfo}>
+                                            <Text style={styles.packageLabel}>Qty</Text>
+                                            <Text style={styles.packageValue}>{item.quantity}</Text>
+                                        </View>
+                                    </View>
+                                    {index < (job.items?.length || 0) - 1 && <View style={styles.divider} />}
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
 
-                        <View style={styles.driverNote}>
-                            <Text style={styles.driverNoteLabel}>Driver Note</Text>
-                            <Text style={styles.driverNoteText}>
-                                "Please call upon arrival. Ring bell #302 at the main gate."
+                {/* Status Info */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Status</Text>
+                    <View style={styles.infoCard}>
+                        <View style={styles.infoRow}>
+                            <IconSymbol name="clock.fill" size={20} color={Colors.textSecondary} />
+                            <Text style={styles.infoText}>
+                                {job.status === 'pending' && 'Waiting for acceptance'}
+                                {job.status === 'accepted' && 'Accepted - Ready for pickup'}
+                                {job.status === 'picked_up' && 'Package picked up'}
+                                {job.status === 'in_transit' && 'In transit'}
+                                {job.status === 'delivered' && 'Delivered'}
+                                {job.status === 'cancelled' && 'Cancelled'}
                             </Text>
                         </View>
                     </View>
@@ -180,18 +307,24 @@ export default function JobDetailsScreen() {
             </ScrollView>
 
             {/* Accept Job Button */}
-            <View style={styles.footer}>
-                <TouchableOpacity
-                    style={styles.acceptButton}
-                    onPress={() => {
-                        console.log('Job accepted:', jobId);
-                        router.back();
-                    }}
-                >
-                    <Text style={styles.acceptButtonText}>Accept Job</Text>
-                    <IconSymbol name="arrow.right" size={24} color={Colors.secondary} />
-                </TouchableOpacity>
-            </View>
+            {!isButtonDisabled && (
+                <View style={styles.footer}>
+                    <TouchableOpacity
+                        style={[styles.acceptButton, isAccepting && styles.disabledButton]}
+                        onPress={handleAccept}
+                        disabled={isAccepting}
+                    >
+                        {isAccepting ? (
+                            <ActivityIndicator size="small" color={Colors.secondary} />
+                        ) : (
+                            <>
+                                <Text style={styles.acceptButtonText}>{getButtonText()}</Text>
+                                <IconSymbol name="arrow.right" size={24} color={Colors.secondary} />
+                            </>
+                        )}
+                    </TouchableOpacity>
+                </View>
+            )}
         </View>
     );
 }
@@ -203,6 +336,15 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    errorText: {
+        color: Colors.textSecondary,
+        fontSize: 16,
     },
     mapContainer: {
         position: 'relative',
@@ -253,7 +395,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 40, // Absolute minimum
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 40,
         paddingBottom: 8,
         zIndex: 10,
         backgroundColor: 'rgba(24, 24, 27, 0.85)',
@@ -262,7 +404,7 @@ const styles = StyleSheet.create({
         backdropFilter: 'blur(10px)',
     },
     overlayButton: {
-        width: 36, // Smaller buttons
+        width: 36,
         height: 36,
         justifyContent: 'center',
         alignItems: 'center',
@@ -270,7 +412,7 @@ const styles = StyleSheet.create({
         borderRadius: 18,
     },
     overlayTitle: {
-        fontSize: 18, // Slightly smaller text
+        fontSize: 18,
         fontWeight: '600',
         color: Colors.white,
     },
@@ -391,8 +533,33 @@ const styles = StyleSheet.create({
     },
     timelineAddress: {
         fontSize: 14,
+        color: Colors.white,
+        marginBottom: 2,
+    },
+    timelineContact: {
+        fontSize: 12,
         color: Colors.textSecondary,
         marginBottom: 16,
+    },
+    infoCard: {
+        backgroundColor: Colors.secondary,
+        borderRadius: 12,
+        padding: 16,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    infoText: {
+        fontSize: 14,
+        color: Colors.white,
+        flex: 1,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: Colors.border,
+        marginVertical: 12,
     },
     packageCard: {
         backgroundColor: Colors.secondary,
@@ -416,24 +583,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: Colors.white,
     },
-    divider: {
-        height: 1,
-        backgroundColor: Colors.border,
-        marginVertical: 16,
-    },
-    driverNote: {},
-    driverNoteLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: Colors.white,
-        marginBottom: 8,
-    },
-    driverNoteText: {
-        fontSize: 14,
-        color: Colors.textSecondary,
-        lineHeight: 20,
-        fontStyle: 'italic',
-    },
     footer: {
         padding: 20,
         backgroundColor: Colors.primary,
@@ -448,6 +597,9 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderRadius: 12,
         gap: 12,
+    },
+    disabledButton: {
+        opacity: 0.6,
     },
     acceptButtonText: {
         fontSize: 18,
