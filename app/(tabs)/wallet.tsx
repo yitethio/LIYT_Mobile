@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, RefreshControl } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { Colors } from '@/constants/theme';
 import { mockDriverProfile, mockTransactions, mockDriverStats } from '@/data/mockData';
@@ -13,21 +13,40 @@ export default function WalletScreen() {
         .filter(t => t.type === 'earning' && t.status === 'pending')
         .reduce((sum, t) => sum + t.amount, 0);
 
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        // Simulate refresh - replace with actual API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setRefreshing(false);
+    }, []);
+
     return (
         <SafeAreaView style={styles.container}>
             <AppHeader
-                userName={mockDriverProfile.name}
                 onNotificationPress={() => console.log('Notifications')}
                 onMenuPress={() => console.log('Menu')}
             />
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                style={styles.content} 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={Colors.accent}
+                        colors={[Colors.accent]}
+                    />
+                }
+            >
                 <Text style={styles.title}>Wallet</Text>
 
                 {/* Balance Card */}
                 <View style={styles.balanceCard}>
                     <Text style={styles.balanceLabel}>Available Balance</Text>
-                    <Text style={styles.balanceAmount}>${totalEarnings.toFixed(2)}</Text>
+                    <Text style={styles.balanceAmount}>ETB {totalEarnings.toFixed(2)}</Text>
                     <TouchableOpacity style={styles.withdrawButton}>
                         <Text style={styles.withdrawButtonText}>Withdraw</Text>
                     </TouchableOpacity>
@@ -38,13 +57,13 @@ export default function WalletScreen() {
                     <View style={styles.statCard}>
                         <Text style={styles.statLabel}>Today</Text>
                         <Text style={styles.statValue}>
-                            ${mockDriverStats.todayEarnings.toFixed(2)}
+                            ETB {mockDriverStats.todayEarnings.toFixed(2)}
                         </Text>
                     </View>
                     <View style={styles.statCard}>
                         <Text style={styles.statLabel}>Pending</Text>
                         <Text style={styles.statValue}>
-                            ${pendingEarnings.toFixed(2)}
+                            ETB {pendingEarnings.toFixed(2)}
                         </Text>
                     </View>
                 </View>
@@ -55,7 +74,7 @@ export default function WalletScreen() {
                     <View style={styles.creditCard}>
                         <View>
                             <Text style={styles.creditLabel}>Available Credit</Text>
-                            <Text style={styles.creditAmount}>$500.00</Text>
+                            <Text style={styles.creditAmount}>ETB 500.00</Text>
                         </View>
                     </View>
                 </View>
@@ -85,7 +104,7 @@ export default function WalletScreen() {
                                     styles.transactionAmount,
                                     isEarning && styles.transactionAmountPositive
                                 ]}>
-                                    {isEarning ? '+' : '-'}${transaction.amount.toFixed(2)}
+                                    {isEarning ? '+' : '-'}ETB {transaction.amount.toFixed(2)}
                                 </Text>
                             </View>
                         );

@@ -149,6 +149,7 @@ export const register = createAsyncThunk(
 
 export const logout = createAsyncThunk('auth/logout', async () => {
     await SecureStore.deleteItemAsync('token');
+    await SecureStore.deleteItemAsync('refresh_token');
     await SecureStore.deleteItemAsync('user');
 });
 

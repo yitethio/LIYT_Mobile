@@ -6,17 +6,19 @@ import { useDispatch, useSelector } from 'react-redux';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { RootState, AppDispatch } from '@/store/store';
-import { fetchDeliveryById, acceptDelivery, clearCurrentDelivery } from '@/store/slices/deliveriesSlice';
+import { fetchDeliveryById, acceptDelivery, pickupDelivery, completeDelivery, clearCurrentDelivery } from '@/store/slices/deliveriesSlice';
 
 export default function JobDetailsScreen() {
     const params = useLocalSearchParams();
     const jobId = params.id as string;
     const dispatch = useDispatch<AppDispatch>();
     const { currentDelivery, loading } = useSelector((state: RootState) => state.deliveries);
-    const [isAccepting, setIsAccepting] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
 
     useEffect(() => {
-        if (jobId) {
+        if (jobId && !isFocused) {
+            setIsFocused(true);
             dispatch(fetchDeliveryById(jobId));
         }
         return () => {
@@ -33,7 +35,7 @@ export default function JobDetailsScreen() {
                 {
                     text: 'Accept',
                     onPress: async () => {
-                        setIsAccepting(true);
+                        setIsProcessing(true);
                         try {
                             await dispatch(acceptDelivery(jobId)).unwrap();
                             Alert.alert('Success', 'Job accepted successfully!', [
@@ -42,7 +44,57 @@ export default function JobDetailsScreen() {
                         } catch (error: any) {
                             Alert.alert('Error', error || 'Failed to accept job');
                         } finally {
-                            setIsAccepting(false);
+                            setIsProcessing(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handlePickup = async () => {
+        Alert.alert(
+            'Mark as Picked Up',
+            'Confirm that you have picked up the package?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Confirm',
+                    onPress: async () => {
+                        setIsProcessing(true);
+                        try {
+                            await dispatch(pickupDelivery(jobId)).unwrap();
+                            Alert.alert('Success', 'Package marked as picked up!');
+                        } catch (error: any) {
+                            Alert.alert('Error', error || 'Failed to mark as picked up');
+                        } finally {
+                            setIsProcessing(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleComplete = async () => {
+        Alert.alert(
+            'Complete Delivery',
+            'Confirm that the package has been delivered?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Confirm',
+                    onPress: async () => {
+                        setIsProcessing(true);
+                        try {
+                            await dispatch(completeDelivery(jobId)).unwrap();
+                            Alert.alert('Success', 'Delivery completed!', [
+                                { text: 'OK', onPress: () => router.back() }
+                            ]);
+                        } catch (error: any) {
+                            Alert.alert('Error', error || 'Failed to complete delivery');
+                        } finally {
+                            setIsProcessing(false);
                         }
                     },
                 },
@@ -67,23 +119,64 @@ export default function JobDetailsScreen() {
         );
     }
 
-    const pickupLocation = job.pickup?.latitude && job.pickup?.longitude ?
-        { latitude: parseFloat(String(job.pickup.latitude)), longitude: parseFloat(String(job.pickup.longitude)) } :
-        job.pickup_address?.latitude && job.pickup_address?.longitude ?
-            { latitude: parseFloat(String(job.pickup_address.latitude)), longitude: parseFloat(String(job.pickup_address.longitude)) } :
-            { latitude: 37.7858, longitude: -122.4065 };
-    
-    const dropoffLocation = job.dropoff?.latitude && job.dropoff?.longitude ?
-        { latitude: parseFloat(String(job.dropoff.latitude)), longitude: parseFloat(String(job.dropoff.longitude)) } :
-        job.dropoff_address?.latitude && job.dropoff_address?.longitude ?
-            { latitude: parseFloat(String(job.dropoff_address.latitude)), longitude: parseFloat(String(job.dropoff_address.longitude)) } :
-            { latitude: 37.7648, longitude: -122.4630 };
+    const handleButtonPress = () => {
+        switch (job.status) {
+            case 'pending':
+                handleAccept();
+                break;
+            case 'accepted':
+                handlePickup();
+                break;
+            case 'picked_up':
+            case 'in_transit':
+                handleComplete();
+                break;
+            default:
+                handleAccept();
+        }
+    };
+
+    const getCoordinates = (stop: any) => {
+        if (!stop) return null;
+        
+        // Try direct lat/lng on the stop
+        if (stop.latitude && stop.longitude) {
+            return {
+                latitude: parseFloat(String(stop.latitude)),
+                longitude: parseFloat(String(stop.longitude))
+            };
+        }
+        
+        // Try nested coordinates
+        if (stop.coordinates?.lat && stop.coordinates?.lng) {
+            return {
+                latitude: parseFloat(String(stop.coordinates.lat)),
+                longitude: parseFloat(String(stop.coordinates.lng))
+            };
+        }
+        
+        // Try geo coordinates
+        if (stop.geo?.latitude && stop.geo?.longitude) {
+            return {
+                latitude: parseFloat(String(stop.geo.latitude)),
+                longitude: parseFloat(String(stop.geo.longitude))
+            };
+        }
+        
+        return null;
+    };
+
+    const defaultPickup = { latitude: 9.0222, longitude: 38.7468 }; // Addis Ababa
+    const defaultDropoff = { latitude: 9.0054, longitude: 38.7636 };
+
+    const pickupCoords = getCoordinates(job.pickup) || getCoordinates(job.pickup_address) || defaultPickup;
+    const dropoffCoords = getCoordinates(job.dropoff) || getCoordinates(job.dropoff_address) || defaultDropoff;
 
     const mapRegion = {
-        latitude: (pickupLocation.latitude + dropoffLocation.latitude) / 2,
-        longitude: (pickupLocation.longitude + dropoffLocation.longitude) / 2,
-        latitudeDelta: Math.abs(pickupLocation.latitude - dropoffLocation.latitude) * 2 || 0.05,
-        longitudeDelta: Math.abs(pickupLocation.longitude - dropoffLocation.longitude) * 2 || 0.05,
+        latitude: (pickupCoords.latitude + dropoffCoords.latitude) / 2,
+        longitude: (pickupCoords.longitude + dropoffCoords.longitude) / 2,
+        latitudeDelta: Math.abs(pickupCoords.latitude - dropoffCoords.latitude) * 2 || 0.05,
+        longitudeDelta: Math.abs(pickupCoords.longitude - dropoffCoords.longitude) * 2 || 0.05,
     };
 
     const getButtonText = () => {
@@ -117,18 +210,18 @@ export default function JobDetailsScreen() {
                         provider={undefined}
                     >
                         <Polyline
-                            coordinates={[pickupLocation, dropoffLocation]}
+                            coordinates={[pickupCoords, dropoffCoords]}
                             strokeColor={Colors.accent}
                             strokeWidth={4}
                         />
 
-                        <Marker coordinate={pickupLocation} title="Pickup">
+                        <Marker coordinate={pickupCoords} title="Pickup">
                             <View style={styles.markerPickup}>
                                 <IconSymbol name="shippingbox.fill" size={16} color={Colors.secondary} />
                             </View>
                         </Marker>
 
-                        <Marker coordinate={dropoffLocation} title="Drop-off">
+                        <Marker coordinate={dropoffCoords} title="Drop-off">
                             <View style={styles.markerDropoff}>
                                 <IconSymbol name="mappin.circle.fill" size={16} color={Colors.white} />
                             </View>
@@ -139,7 +232,13 @@ export default function JobDetailsScreen() {
                     <View style={styles.overlayHeader}>
                         <TouchableOpacity
                             style={styles.overlayButton}
-                            onPress={() => router.back()}
+                            onPress={() => {
+                                if (router.canGoBack()) {
+                                    router.back();
+                                } else {
+                                    router.replace('/(tabs)');
+                                }
+                            }}
                         >
                             <IconSymbol name="chevron.left" size={24} color={Colors.white} />
                         </TouchableOpacity>
@@ -153,7 +252,7 @@ export default function JobDetailsScreen() {
                     <View style={styles.floatingStatsContainer}>
                         <View style={styles.statCard}>
                             <Text style={styles.statLabel}>Payout</Text>
-                            <Text style={styles.statValue}>${Number(job.price).toFixed(2)}</Text>
+                            <Text style={styles.statValue}>ETB {Number(job.price).toFixed(2)}</Text>
                         </View>
                         <View style={styles.statCard}>
                             <Text style={styles.statLabel}>Distance</Text>
@@ -310,11 +409,11 @@ export default function JobDetailsScreen() {
             {!isButtonDisabled && (
                 <View style={styles.footer}>
                     <TouchableOpacity
-                        style={[styles.acceptButton, isAccepting && styles.disabledButton]}
-                        onPress={handleAccept}
-                        disabled={isAccepting}
+                        style={[styles.acceptButton, isProcessing && styles.disabledButton]}
+                        onPress={handleButtonPress}
+                        disabled={isProcessing}
                     >
-                        {isAccepting ? (
+                        {isProcessing ? (
                             <ActivityIndicator size="small" color={Colors.secondary} />
                         ) : (
                             <>
@@ -438,7 +537,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     statValue: {
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: '700',
         color: Colors.accent,
     },

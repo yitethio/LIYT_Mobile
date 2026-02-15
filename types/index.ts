@@ -124,6 +124,13 @@ export interface Delivery {
     created_at: string;
     pickup?: DeliveryStop;
     dropoff?: DeliveryStop;
+    pickup_address?: DeliveryAddress;
+    dropoff_address?: DeliveryAddress;
+    // Potential coordinate fields
+    latitude?: number | string;
+    longitude?: number | string;
+    coordinates?: { lat?: number | string; lng?: number | string };
+    geo?: { latitude?: number | string; longitude?: number | string };
     business?: {
         id: number;
         name: string;
@@ -134,8 +141,6 @@ export interface Delivery {
         phone: string;
     };
     items?: DeliveryItem[];
-    pickup_address?: DeliveryAddress;
-    dropoff_address?: DeliveryAddress;
 }
 
 export interface DeliveryState {

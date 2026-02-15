@@ -1,19 +1,31 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Switch, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Switch, Alert, RefreshControl } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { RootState, AppDispatch } from '@/store/store';
-import { logout } from '@/store/slices/authSlice';
+import { fetchProfile, logout } from '@/store/slices/authSlice';
 
 export default function SettingsScreen() {
     const dispatch = useDispatch<AppDispatch>();
     const router = useRouter();
     const { user } = useSelector((state: RootState) => state.auth);
+    const [refreshing, setRefreshing] = useState(false);
+    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+    const [locationEnabled, setLocationEnabled] = useState(true);
 
-    const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
-    const [locationEnabled, setLocationEnabled] = React.useState(true);
+    useFocusEffect(
+        useCallback(() => {
+            dispatch(fetchProfile());
+        }, [dispatch])
+    );
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await dispatch(fetchProfile());
+        setRefreshing(false);
+    }, [dispatch]);
 
     const handleLogout = () => {
         Alert.alert(
@@ -41,7 +53,18 @@ export default function SettingsScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                style={styles.content} 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={Colors.accent}
+                        colors={[Colors.accent]}
+                    />
+                }
+            >
                 {/* Header */}
                 <View style={styles.header}>
                     <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -165,6 +188,7 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
+        paddingBottom: 100,
     },
     header: {
         flexDirection: 'row',
