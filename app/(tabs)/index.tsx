@@ -31,10 +31,6 @@ export default function HomeScreen() {
   const availableJobs = deliveries.filter(job => job.status === 'pending');
   const currentJobs = deliveries.filter(job => ['accepted', 'picked_up', 'in_transit'].includes(job.status));
 
-  const handleJobPress = (jobId: number) => {
-    router.push({ pathname: '/job-details', params: { id: jobId.toString() } });
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader
@@ -120,7 +116,6 @@ export default function HomeScreen() {
               estimatedTime="0 min"
               price={Number(job.price)}
               tags={[]}
-              onPress={() => handleJobPress(job.id)}
             />
           ))}
 
@@ -136,7 +131,6 @@ export default function HomeScreen() {
               estimatedTime="0 min"
               price={Number(job.price)}
               tags={[job.status.replace('_', ' ')]}
-              onPress={() => handleJobPress(job.id)}
             />
           ))}
 

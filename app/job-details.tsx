@@ -232,13 +232,7 @@ export default function JobDetailsScreen() {
                     <View style={styles.overlayHeader}>
                         <TouchableOpacity
                             style={styles.overlayButton}
-                            onPress={() => {
-                                if (router.canGoBack()) {
-                                    router.back();
-                                } else {
-                                    router.replace('/(tabs)');
-                                }
-                            }}
+                            onPress={() => router.replace('/(tabs)')}
                         >
                             <IconSymbol name="chevron.left" size={24} color={Colors.white} />
                         </TouchableOpacity>
